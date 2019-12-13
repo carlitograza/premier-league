@@ -17,7 +17,7 @@ class CreatePlayersTable extends Migration
             $table->bigIncrements('id');
             $table->string('chance_of_playing_next_round')->nullable();
             $table->string('chance_of_playing_this_round')->nullable();
-            $table->string('code')->nullable();
+            $table->string('code');
             $table->integer('cost_change_event')->nullable();
             $table->integer('cost_change_event_fall')->nullable();
             $table->integer('cost_change_start')->nullable();
@@ -27,11 +27,10 @@ class CreatePlayersTable extends Migration
             $table->float('ep_next')->nullable();
             $table->float('ep_this')->nullable();
             $table->integer('event_points')->nullable();
-            $table->string('first_name')->nullable();
+            $table->string('first_name');
             $table->string('form')->nullable();
-            $table->bigInteger('p_id')->nullable();
             $table->string('in_dreamteam')->nullable();
-            $table->string('news')->nullable();
+            $table->longText('news')->nullable();
             $table->string('news_added')->nullable();
             $table->integer('now_cost')->nullable();
             $table->string('photo')->nullable();

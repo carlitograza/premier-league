@@ -1,85 +1,47 @@
 <?php
 
-namespace App\Console\Commands;
+namespace App\Http\Controllers;
 
-use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
-
+use Illuminate\Http\Request;
 use App\Model\PlayerModel;
 
-
-class player extends Command
+class testcontroller extends Controller
 {
 
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
-    protected $signature = 'player:get';
+    protected $url = 'http://localhost/premierleague/backend/public/data_camel.json/';
+    //protected $url = 'http://localhost/premierleague/backend/public/data.xml/';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Fetching Player Remote from API';
-
-    /**
-     * API URL for players
-     *
-     * @var string
-     */
-    protected $url = 'http://localhost/premierleague/backend/public/data.xml/';
-    //protected $url = 'https://fantasy.premierleague.com/api/bootstrap-static/';
-
-
-    /**
-     * Data Naming Convention
-     *
-     * @var string
-     */
-    protected $defaultNamingConvention = "snake"; // studly, camel, snake
-
-    /**
-     * Create a new command instance.
-     *
-     * @return void
-     */
-    public function __construct()
-    {
-        parent::__construct();
-    }
-
-    /**
-     * Execute the console command.
-     *
-     * @return mixed
-     */
     public function handle()
     {
 
-        // Get Player From API and save to MySQL DB
-        $getPlayer = $this->getAndSavePlayerData($this->url);
+        $importer = \CGraza\DataImporter::fetch($this->url, "snake");
+        dump($importer);
 
         // Check if response is success
-        if (!$getPlayer["status"]) {
-            // Log Error if not success
-            Log::error($getPlayer['status_message']);
-            return;
-        } else {
-            // Log Info if success
-            Log::info("Auto Fetching Player: Success");
-        }
+        // if (!$importer["status"]) {
+        //     // Log Error if not success
+        //     Log::error("Auto Fetching Player: ". $importer['status_message']);
+        //     return;
+        // } else {
+        //     // Log Info if success
+        //     Log::info("Auto Fetching Player: Success");
+        // }
+
+
     }
 
-    public function getAndSavePlayerData(string $url)
+    /*
+     *  Fetch Data from URL the save to MYSQL DB
+     *  @return
+     *      array status
+     * 
+    */
+    public function getAndSavePlayerData()
     {
-
+        // Get Data from URL
         // CUrl Process
-        $curl = curl_init($url);
+        $curl = curl_init($this->url);
         curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
 
@@ -96,26 +58,33 @@ class player extends Command
         curl_close($curl);
 
         if ($isError) return array("status" => 0, "status_message" => $errorMessage);
-        // Fetch Data into JSON and XML
+        // Convert String of Data into array from JSON or XML
         else return $this->fetchJSONXML($dataString);
     }
 
-    // Convert Data into array from JSON or XML
+    // 
+    /*
+     *  Convert String of Data into array from JSON or XML
+     *  @param
+     *      string $playerString    |   required
+     *
+    */
     public function fetchJSONXML(string $playerString)
     {
         // Check if data is JSON
         $dataObj = json_decode($playerString);
         if ((json_last_error() == JSON_ERROR_NONE)) {
             $data = json_decode(json_encode($dataObj), true);
+            $data = array_keys_to_new_naming_convention($data, "snake"); // Handle Naming Convention
             if (!empty($data["elements"]))
                 return $this->savePlayer($data["elements"]); // Return Players
         } else {
-
             // Check if data is XML
             libxml_use_internal_errors(true);
             $playerString = simplexml_load_string($playerString);
             if ($playerString) {
                 $data = json_decode(json_encode($playerString), true);
+                $data = array_keys_to_new_naming_convention($data, "snake"); // Handle Naming Convention
                 if (!empty($data["elements"]["element"]))
                     return $this->savePlayer($data["elements"]["element"]); // Return Players
             }
@@ -127,19 +96,13 @@ class player extends Command
     // Save Player
     public function savePlayer(array $players)
     {
-
-        // $players = array_slice($players, 0, 1);
-
-        //Create Player Model
         $data = [];
         foreach ($players as $player) {
+            //Create Player Model
             $playerObj = new PlayerModel();
             $playerObj->set($player);
             $playerObj->save();
         }
-
         return array("status" => 1);
     }
-
-
 }
