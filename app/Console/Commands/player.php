@@ -32,8 +32,11 @@ class player extends Command
      *
      * @var string
      */
-    protected $url = 'http://localhost/premierleague/backend/public/data.xml/';
     //protected $url = 'https://fantasy.premierleague.com/api/bootstrap-static/';
+    //protected $url = 'https://utils.crmweb.com.ph/premierleague/public/data.xml';
+    protected $url = 'https://utils.crmweb.com.ph/premierleague/public/data_snake.json';
+    //protected $url = 'https://utils.crmweb.com.ph/premierleague/public/data_camel.json';
+    //protected $url = 'https://utils.crmweb.com.ph/premierleague/public/data_studly.json';
 
 
     /**
@@ -60,85 +63,46 @@ class player extends Command
      */
     public function handle()
     {
+        $importer = new \CGraza\DataImporter($this->url);     // Data Importer
+        $response = $importer->toSnake()->get();
 
-        // Get Player From API and save to MySQL DB
-        $getPlayer = $this->getAndSavePlayerData($this->url);
-
-        // Check if response is success
-        if (!$getPlayer["status"]) {
-            // Log Error if not success
-            Log::error($getPlayer['status_message']);
-            return;
-        } else {
-            // Log Info if success
-            Log::info("Auto Fetching Player: Success");
-        }
+        $this->handleDifferentSourceType($response);
+        Log::info("Auto Fetching Player: Success");
     }
 
-    public function getAndSavePlayerData(string $url)
+
+    /**
+     *  Handle Different Source Type
+     *  from XML Type or JSON Type
+     * @param
+     *      array $response
+     */ 
+    public function handleDifferentSourceType(array $response)
     {
-
-        // CUrl Process
-        $curl = curl_init($url);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($curl, CURLOPT_FOLLOWLOCATION, true);
-
-        $dataString = curl_exec($curl);
-
-        // Check for Curl Error
-        $isError = false;
-        $errorMessage = "";
-        $statusCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        if (curl_errno($curl) || $statusCode !== 200) {
-            $isError = true;
-            $errorMessage = "Auto Fetching Player: Unexpected HTTP code: " . $statusCode;
-        }
-        curl_close($curl);
-
-        if ($isError) return array("status" => 0, "status_message" => $errorMessage);
-        // Fetch Data into JSON and XML
-        else return $this->fetchJSONXML($dataString);
-    }
-
-    // Convert Data into array from JSON or XML
-    public function fetchJSONXML(string $playerString)
-    {
-        // Check if data is JSON
-        $dataObj = json_decode($playerString);
-        if ((json_last_error() == JSON_ERROR_NONE)) {
-            $data = json_decode(json_encode($dataObj), true);
-            if (!empty($data["elements"]))
-                return $this->savePlayer($data["elements"]); // Return Players
+        // Fetch Player
+        if ($response["source_type"] === 'json') {
+            if (!empty($response["data"]["elements"]))
+                $players = $response["data"]["elements"];
         } else {
-
-            // Check if data is XML
-            libxml_use_internal_errors(true);
-            $playerString = simplexml_load_string($playerString);
-            if ($playerString) {
-                $data = json_decode(json_encode($playerString), true);
-                if (!empty($data["elements"]["element"]))
-                    return $this->savePlayer($data["elements"]["element"]); // Return Players
-            }
+            if (!empty($response["data"]["elements"]["element"]))
+                $players = $response["data"]["elements"]["element"];
         }
-
-        return array("status" => 0, "status_message" => "Auto Fetching Player: Invalid Data");
+        $this->savePlayer($players);
     }
 
-    // Save Player
+    /**
+     *  Save Player to DB
+     * @param
+     *      array $players
+     */ 
     public function savePlayer(array $players)
     {
-
-        // $players = array_slice($players, 0, 1);
-
-        //Create Player Model
-        $data = [];
         foreach ($players as $player) {
+            //Create Player Model
             $playerObj = new PlayerModel();
             $playerObj->set($player);
             $playerObj->save();
         }
-
-        return array("status" => 1);
     }
 
 
